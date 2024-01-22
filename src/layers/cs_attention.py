@@ -38,20 +38,42 @@ class ChannelAttention(nn.Module):
 
         return y*z_final
 
+class SpatialAttention(torch.nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.input_shape = None
+        self.lazy_conv2d_query = torch.nn.LazyConv2d(1,1)
+        self.lazy_conv2d_key = torch.nn.LazyConv2d(1,1)
+        self.lazy_conv2d_value = torch.nn.LazyConv2d(1,1)
+        self.lazy_conv2d_2 = None
 
+    def build(self, x)->None:
+        self.input_shape = x.size()
+        self.lazy_conv2d_2 = torch.nn.LazyConv2d(self.input_shape[-3],1)
+
+    @staticmethod
+    def reshape_3d(x:torch.Tensor)->torch.Tensor:
+        """
+        Convert a tensor (B,C,H,W) into (B,C*H,W)
+        """
+        x_shape = x.size()
+        return torch.reshape(x,(x_shape[0],x_shape[-3]*x_shape[-2],x_shape[-1]))
+
+    def forward(self, x:torch.Tensor)->torch.Tensor:
+        if self.input_shape is None:
+            self.build(x)
+        q = self.reshape_3d(self.lazy_conv2d_query(x))
+        k = self.reshape_3d(self.lazy_conv2d_key(x))
+        v = self.reshape_3d(self.lazy_conv2d_value(x))
+        qk = torch.matmul(q, k.transpose(-2,-1))
+        attention_weights = F.softmax(qk, dim=-1)
+        qkv = torch.matmul(attention_weights, v)
+        z = self.lazy_conv2d_2(torch.unsqueeze(qkv,dim=1))
+        return z
 
 
 if __name__=="__main__":
     input_image_size = torch.rand(128, 20, 20, 5)
-    Fc = ChannelAttention(32)(input_image_size)
-    print(Fc.size())
-    z = torch.nn.LazyConv2d(1,1)(Fc)
-    print(z.size())
-    z_f = torch.reshape(z,(z.size(0),z.size(1)*z.size(2),z.size(3)))
-    z_f2 = torch.matmul(z_f,z_f.transpose(-2, -1))
-    attention_weights = F.softmax(z_f2, dim=-1)
-    output = torch.matmul(attention_weights, z_f)
-    output = torch.nn.LazyConv2d(10,1)(torch.unsqueeze(output,dim=1))
-    print(output.size())
-    print((output+Fc).size())
+    Fc = ChannelAttention(64)(input_image_size)
+    print((SpatialAttention()(Fc) + Fc).size() == Fc.size())
     
