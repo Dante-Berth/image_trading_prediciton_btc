@@ -38,7 +38,47 @@ class ChannelAttention(nn.Module):
 
         return y*z_final
 
-class SpatialAttention(torch.nn.Module):
+class SpatialAttentionLinear(torch.nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.input_shape = None
+        self.lazy_linear_query = None
+        self.lazy_linear_key = None
+        self.lazy_linear_value = None
+        self.lazy_conv2d_1 = None
+        self.lazy_conv2d_2 = None
+
+    def build(self, x)->None:
+        self.input_shape = x.size()
+        self.lazy_conv2d_1 = torch.nn.LazyConv2d(self.input_shape[-3],1)
+        self.lazy_conv2d_2 = torch.nn.LazyConv2d(self.input_shape[-2],1)
+        self.lazy_linear_query = torch.nn.LazyLinear(self.input_shape[-1])
+        self.lazy_linear_key = torch.nn.LazyLinear(self.input_shape[-1])
+        self.lazy_linear_value = torch.nn.LazyLinear(self.input_shape[-1])
+
+    @staticmethod
+    def reshape_3d(x:torch.Tensor)->torch.Tensor:
+        """
+        Convert a tensor (B,C,H,W) into (B,C*H,W)
+        """
+        x_shape = x.size()
+        return torch.reshape(x,(x_shape[0],x_shape[-3]*x_shape[-2],x_shape[-1]))
+
+    def forward(self, x:torch.Tensor)->torch.Tensor:
+        if self.input_shape is None:
+            self.build(x)
+        q = self.reshape_3d(self.lazy_linear_query(x))
+        k = self.reshape_3d(self.lazy_linear_key(x))
+        v = self.reshape_3d(self.lazy_linear_value(x))
+        qk = torch.matmul(q, k.transpose(-2,-1))
+        attention_weights = F.softmax(qk, dim=-1)
+        qkv = torch.matmul(attention_weights, v)
+        z = self.lazy_conv2d_1(torch.unsqueeze(qkv,dim=1))
+        z = z.transpose(-3,-2)
+        z = self.lazy_conv2d_2(z)
+        return z
+
+class SpatialAttentionConvolution(torch.nn.Module):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.input_shape = None
@@ -75,5 +115,5 @@ class SpatialAttention(torch.nn.Module):
 if __name__=="__main__":
     input_image_size = torch.rand(128, 20, 20, 5)
     Fc = ChannelAttention(64)(input_image_size)
-    print((SpatialAttention()(Fc) + Fc).size() == Fc.size())
+    print((SpatialAttentionLinear()(Fc) + Fc + SpatialAttentionConvolution()(Fc)).size() == Fc.size())
     
