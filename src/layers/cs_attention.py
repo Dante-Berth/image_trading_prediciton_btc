@@ -115,5 +115,5 @@ class SpatialAttentionConvolution(torch.nn.Module):
 if __name__=="__main__":
     input_image_size = torch.rand(128, 20, 20, 5)
     Fc = ChannelAttention(64)(input_image_size)
-    print((SpatialAttentionLinear()(Fc) + Fc + SpatialAttentionConvolution()(Fc)).size() == Fc.size())
+    print((SpatialAttentionLinear()(Fc) + Fc + SpatialAttentionLinear()(Fc)).size() == Fc.size())
     
