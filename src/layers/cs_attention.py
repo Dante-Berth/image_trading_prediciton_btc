@@ -41,31 +41,29 @@ class ChannelAttention(nn.Module):
 class SpatialAttentionLinear(torch.nn.Module):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.input_shape = None
+        self.B,self.H,self.W,self.C = None, None, None, None
         self.lazy_linear_query = None
         self.lazy_linear_key = None
         self.lazy_linear_value = None
-        self.lazy_conv2d_1 = None
-        self.lazy_conv2d_2 = None
 
-    def build(self, x)->None:
-        self.input_shape = x.size()
-        self.lazy_conv2d_1 = torch.nn.LazyConv2d(self.input_shape[-3],1)
-        self.lazy_conv2d_2 = torch.nn.LazyConv2d(self.input_shape[-2],1)
-        self.lazy_linear_query = torch.nn.LazyLinear(self.input_shape[-1])
-        self.lazy_linear_key = torch.nn.LazyLinear(self.input_shape[-1])
-        self.lazy_linear_value = torch.nn.LazyLinear(self.input_shape[-1])
+    def build(self, x:torch.tensor)->None:
+        self.B,self.H,self.W,self.C = x.size()
+        self.lazy_linear_query = torch.nn.LazyLinear(self.C)
+        self.lazy_linear_key = torch.nn.LazyLinear(self.C)
+        self.lazy_linear_value = torch.nn.LazyLinear(self.C)
+        self.weights_parameter = torch.nn.Parameter(torch.randn(self.H,self.H*self.W,self.W))
+
 
     @staticmethod
-    def reshape_3d(x:torch.Tensor)->torch.Tensor:
+    def reshape_3d(x:torch.tensor)->torch.tensor:
         """
-        Convert a tensor (B,C,H,W) into (B,C*H,W)
+        Convert a tensor (B,H,W,C) into (B,H*W,C)
         """
         x_shape = x.size()
         return torch.reshape(x,(x_shape[0],x_shape[-3]*x_shape[-2],x_shape[-1]))
 
     def forward(self, x:torch.Tensor)->torch.Tensor:
-        if self.input_shape is None:
+        if self.C is None:
             self.build(x)
         q = self.reshape_3d(self.lazy_linear_query(x))
         k = self.reshape_3d(self.lazy_linear_key(x))
@@ -73,9 +71,9 @@ class SpatialAttentionLinear(torch.nn.Module):
         qk = torch.matmul(q, k.transpose(-2,-1))
         attention_weights = F.softmax(qk, dim=-1)
         qkv = torch.matmul(attention_weights, v)
-        z = self.lazy_conv2d_1(torch.unsqueeze(qkv,dim=1))
-        z = z.transpose(-3,-2)
-        z = self.lazy_conv2d_2(z)
+        # it is needed to add a dimension and to  transpose 
+        # for having the right dimensions for more details :https://pytorch.org/docs/stable/generated/torch.matmul.html#torch-matmul
+        z = torch.matmul(qkv.transpose(-2,-1).unsqueeze(dim=1),self.weights_parameter).transpose(-2,-1)
         return z
 
 class SpatialAttentionConvolution(torch.nn.Module):
@@ -87,7 +85,7 @@ class SpatialAttentionConvolution(torch.nn.Module):
         self.lazy_conv2d_value = torch.nn.LazyConv2d(1,1)
         self.lazy_conv2d_2 = None
 
-    def build(self, x)->None:
+    def build(self, x:torch.tensor)->None:
         self.input_shape = x.size()
         self.lazy_conv2d_2 = torch.nn.LazyConv2d(self.input_shape[-3],1)
 
@@ -111,9 +109,40 @@ class SpatialAttentionConvolution(torch.nn.Module):
         z = self.lazy_conv2d_2(torch.unsqueeze(qkv,dim=1))
         return z
 
+class block_cs_ann(torch.nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.activation = torch.nn.SiLU()
+        self.batch_normalization = None
+        self.maxpooling2d = torch.nn.MaxPool2d((2,2))
+        self.channel_attention = ChannelAttention(nb_features=32,reduction=1)
+        self.spatial_attention_linear = SpatialAttentionLinear()
+        self.spatial_attention_convolution = SpatialAttentionConvolution()
+        self.input_shape = None
 
+    def build(self,x:torch.tensor)->None:
+        self.input_shape = x.size()
+        self.batch_normalization = nn.BatchNorm2d(x.size(-3))
+
+    def forward(self,x:torch.tensor)->torch.tensor:
+        if self.input_shape is None:
+            self.build(x)
+        x = self.activation(x)
+        x = self.batch_normalization(x)
+        x = self.maxpooling2d(x)
+        x_ca = self.channel_attention(x)
+        return (self.spatial_attention_linear(x_ca) + self.spatial_attention_convolution(x_ca))*x_ca
+        
 if __name__=="__main__":
+    """
+    Problem with the Maxlayer we should transpose https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html
+    """
     input_image_size = torch.rand(128, 20, 20, 5)
-    Fc = ChannelAttention(64)(input_image_size)
-    print((SpatialAttentionLinear()(Fc) + Fc + SpatialAttentionLinear()(Fc)).size() == Fc.size())
+    x = block_cs_ann()(input_image_size)
+    x = block_cs_ann()(x)
+    x = block_cs_ann()(x)
+    print(x.size())
+
+    
+
     
