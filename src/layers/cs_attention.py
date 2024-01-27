@@ -110,12 +110,12 @@ class SpatialAttentionConvolution(torch.nn.Module):
         return z
 
 class block_cs_ann(torch.nn.Module):
-    def __init__(self, nb_features:int=32,reduction:int=1,*args, **kwargs) -> None:
+    def __init__(self, nb_features:int=32,reduction:int=1, max_pool_reduction=2,*args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.activation = torch.nn.SiLU()
         self.batch_normalization = None
-        self.maxpooling2d = torch.nn.MaxPool2d((2,2))
-        self.channel_attention = ChannelAttention(nb_features=32,reduction=1)
+        self.maxpooling2d = torch.nn.MaxPool2d((max_pool_reduction,max_pool_reduction))
+        self.channel_attention = ChannelAttention(nb_features=nb_features,reduction=reduction)
         self.spatial_attention_linear = SpatialAttentionLinear()
         self.spatial_attention_convolution = SpatialAttentionConvolution()
         self.input_shape = None
@@ -134,9 +134,6 @@ class block_cs_ann(torch.nn.Module):
         return (self.spatial_attention_linear(x_ca) + self.spatial_attention_convolution(x_ca))*x_ca
         
 if __name__=="__main__":
-    """
-    Problem with the Maxlayer we should transpose https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html
-    """
     input_image_size = torch.rand(128, 64, 64, 4)
     x = block_cs_ann()(input_image_size)
     x = block_cs_ann()(x)
