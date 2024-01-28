@@ -3,11 +3,12 @@ from layers.gramian_angular import GramianAngularFieldPytorch
 from layers.cs_attention import block_cs_ann
 
 class cs_ann(torch.nn.Module):
-    def __init__(self, config,*args, **kwargs) -> None:
+    def __init__(self, config,config_problem,*args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         self.angular_field = GramianAngularFieldPytorch(method="summation")
         self.config = config
+        self.config_problem = config_problem
         self.list_layers = []
         for key in config.keys():
             self.list_layers.append(block_cs_ann(nb_features=config[key]["nb_features"],reduction=config[key]["reduction"], max_pool_reduction=config[key]["max_pool_reduction"]))
@@ -20,6 +21,7 @@ class cs_ann(torch.nn.Module):
         x = x.unsqueeze(-1)
         y = torch.cat((x_gramian_angular, x), dim=-1).transpose(-3,-1)
         return self.sequential_layers(y)
+
 if __name__=="__main__":
     x = torch.rand(128, 5, 64)
     config = {

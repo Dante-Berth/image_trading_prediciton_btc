@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from utils.utils_df import y_build,open_dataframe,filter_dataframe_by_date_range
-from normalization import normalizer
+from normalisation.normalization import normalizer
 from typing import Optional
 class AtomicSequencer(Dataset):
     def __init__(self, PATH,begin_date:Optional[str]=None,end_date:Optional[str]=None,time_steps=64):
