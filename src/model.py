@@ -3,9 +3,9 @@ from layers.gramian_angular import GramianAngularFieldPytorch
 from layers.cs_attention import block_cs_ann
 
 class cs_ann(torch.nn.Module):
-    def __init__(self, config,config_problem,*args, **kwargs) -> None:
+    def __init__(self, config,config_problem=None, channels_first=True,*args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
+        self.channels_first=channels_first
         self.angular_field = GramianAngularFieldPytorch(method="summation")
         self.config = config
         self.config_problem = config_problem
@@ -17,13 +17,15 @@ class cs_ann(torch.nn.Module):
 
 
     def forward(self,x):
+        if self.channels_first:
+            x = x.transpose(-2,-1)
         x_gramian_angular = self.angular_field(x)
         x = x.unsqueeze(-1)
         y = torch.cat((x_gramian_angular, x), dim=-1).transpose(-3,-1)
         return self.sequential_layers(y)
 
 if __name__=="__main__":
-    x = torch.rand(128, 5, 64)
+    x = torch.rand(128, 64, 4)
     config = {
         'layer_1':{
             'nb_features':32,

@@ -12,16 +12,15 @@ class LitModelCs(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         z = self.model(x)
-        loss = torch.nn.functional.cross_entropy(z, y)
+        loss = torch.nn.functional.cross_entropy(z.squeeze(-1), y)
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         z = self.model(x)
-        loss = torch.nn.functional.cross_entropy(z, y)
-        self.validation_step_outputs.append(loss)
-        self.log("validation_loss", self.validation_step_outputs[-1], on_step=True, on_epoch=True, prog_bar=True)
+        loss = torch.nn.functional.cross_entropy(z.squeeze(-1), y)
+        self.log("validation_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
 
@@ -30,6 +29,8 @@ class LitModelCs(pl.LightningModule):
         return optimizer
 
 if __name__=="__main__":
+    PATH = r"./data/binance-BTCUSDT-5m.pkl"
+    config_problem = None
     config = {
         'layer_1':{
             'nb_features':32,
@@ -47,10 +48,16 @@ if __name__=="__main__":
             "max_pool_reduction":1
         },
     }
-    cs_model = cs_ann(config)
+    batch_size = 128
+
+
+    cs_model = cs_ann(config,config_problem=None,channels_first=True)
+
+    train_atomic_dataset = AtomicSequencer(PATH=PATH, begin_date="2018-05-01", end_date="2021-11-03")
+    train_dataloader = DataLoader(train_atomic_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
+    
 
     mlp_model = torch.nn.Sequential(
-    torch.nn.MaxPool2d(2,2),
     torch.nn.Flatten(),
     torch.nn.LazyLinear(out_features=32),
     torch.nn.BatchNorm1d(32),
@@ -66,17 +73,11 @@ if __name__=="__main__":
         cs_model,
         mlp_model
     )
-    
-    PATH = r"./data/binance-BTCUSDT-5m.pkl"
-     
-    train_atomic_dataset = AtomicSequencer(PATH=PATH, begin_date="2018-05-01", end_date="2021-11-03")
-    val_atomic_dataset = AtomicSequencer(PATH=PATH, begin_date="2021-11-03", end_date="2022-11-03")
-    batch_size = 128
-    train_dataloader = DataLoader(train_atomic_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
-    val_dataloader = DataLoader(val_atomic_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
-    print("Model")
-    x = next(iter(train_dataloader))[0]
+    x,z = next(iter(train_dataloader))
     y = combined_model(x)
+    
+    val_atomic_dataset = AtomicSequencer(PATH=PATH, begin_date="2021-11-03", end_date="2022-11-04")
+    val_dataloader = DataLoader(val_atomic_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
     model = LitModelCs(model=combined_model)
     print("Begging")
     trainer = pytorch_lightning.Trainer(enable_progress_bar=True)#,callbacks=[MyCallback()])
