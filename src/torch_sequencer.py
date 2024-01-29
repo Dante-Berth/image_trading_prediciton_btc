@@ -21,8 +21,8 @@ class AtomicSequencer(Dataset):
     def __getitem__(self, idx):
         actual_idx = self.valid_indexes[idx]
         data = normalizer.log_division_normalization(df=self.df[self.column_names].iloc[actual_idx-self.time_steps:actual_idx],row=0)
-        x = torch.tensor(data.values)
-        y = torch.tensor(self.df[f"{self.column}_label"].iloc[actual_idx])
+        x = torch.tensor(data.values,dtype=torch.float32)
+        y = torch.tensor(self.df[f"{self.column}_label"].iloc[actual_idx],dtype=torch.float32)
         return x,y
     
 if __name__=="__main__":
