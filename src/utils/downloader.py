@@ -109,9 +109,9 @@ def download(*args, **kwargs):
 async def main():
     await _download(
         ["binance"], # select your exchange
-        symbols=["EUR/USDT","BTC/USDT","ETH/USDT"], # select your currencies
-        timeframe="5m", # the time frame
-        dir="../data", # directory
+        symbols=["BTC/USDT"], # select your currencies
+        timeframe="1h", # the time frame
+        dir="./data", # directory
         since=datetime.datetime(year=2018, month=4, day=1), # starting date
     )
 
