@@ -6,6 +6,7 @@ from torch_sequencer import AtomicSequencer
 from torch.utils.data import DataLoader
 class LitModelCs(pl.LightningModule):
     def __init__(self, model):
+        # https://lightning.ai/docs/pytorch/stable/common/lightning_module.html
         super().__init__()
         self.model = model
 
@@ -79,7 +80,7 @@ if __name__=="__main__":
     val_atomic_dataset = AtomicSequencer(PATH=PATH, begin_date="2021-11-03", end_date="2022-11-04")
     val_dataloader = DataLoader(val_atomic_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
     model = LitModelCs(model=combined_model)
-    print("Begging")
-    trainer = pytorch_lightning.Trainer(enable_progress_bar=True)#,callbacks=[MyCallback()])
+    trainer = pytorch_lightning.Trainer(enable_progress_bar=True)
+    
     trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
