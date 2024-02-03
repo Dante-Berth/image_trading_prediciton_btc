@@ -12,7 +12,6 @@ class cs_ann(torch.nn.Module):
         self.list_layers = []
         for key in config.keys():
             self.list_layers.append(block_cs_ann(nb_features=config[key]["nb_features"],reduction=config[key]["reduction"], max_pool_reduction=config[key]["max_pool_reduction"]))
-
         self.sequential_layers = torch.nn.Sequential(*self.list_layers)
 
 
