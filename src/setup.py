@@ -20,14 +20,14 @@ class LitModelCs(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         z = self.model(x)
-        loss = torch.nn.functional.cross_entropy(z.squeeze(-1), y)
+        loss = torch.nn.functional.cross_entropy(z.squeeze(-1), y)/y.size(0)
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         z = self.model(x)
-        loss = torch.nn.functional.cross_entropy(z.squeeze(-1), y)
+        loss = torch.nn.functional.cross_entropy(z.squeeze(-1), y)/y.size(0)
         self.log("validation_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
@@ -47,7 +47,7 @@ class LitModelCs(pl.LightningModule):
     
     def val_dataloader(self):
         val_atomic_dataset = AtomicSequencer(PATH=self.hparams["PATH"], begin_date=self.hparams["validation"]["begin_date"], end_date=self.hparams["validation"]["end_date"])
-        val_dataloader = DataLoader(val_atomic_dataset, batch_size=self.hparams["batch_size"], persistent_workers=True,shuffle=True, num_workers=6)
+        val_dataloader = DataLoader(val_atomic_dataset, batch_size=self.hparams["batch_size"], persistent_workers=True, num_workers=6)
         return val_dataloader
 
 if __name__=="__main__":
@@ -89,10 +89,10 @@ if __name__=="__main__":
     torch.nn.Flatten(),
     torch.nn.LazyLinear(out_features=32),
     torch.nn.BatchNorm1d(32),
-    torch.nn.Tanh(),
+    torch.nn.SiLU(),
     torch.nn.LazyLinear(out_features=64),
     torch.nn.BatchNorm1d(64),
-    torch.nn.Tanh(),
+    torch.nn.SiLU(),
     torch.nn.LazyLinear(out_features=16),
     torch.nn.LazyLinear(out_features=1),
     torch.nn.Sigmoid())
