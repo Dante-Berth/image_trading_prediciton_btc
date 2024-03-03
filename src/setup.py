@@ -37,8 +37,8 @@ class LitModelCs(pl.LightningModule):
                                                          mode='min',
                                                          factor=0.2,
                                                          patience=5,
-                                                         min_lr=5e-7)
-        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "val_loss"}
+                                                         min_lr=5e-8)
+        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "validation_loss"}
 
     def train_dataloader(self):
         train_atomic_dataset = AtomicSequencer(PATH=self.hparams["PATH"], begin_date=self.hparams["train"]["begin_date"], end_date=self.hparams["train"]["end_date"])
@@ -115,7 +115,7 @@ if __name__=="__main__":
                       max_epochs=150,
                       callbacks=[ModelCheckpoint(save_weights_only=True, mode="min", monitor="validation_loss"),
                                  LearningRateMonitor("epoch"),
-                                 EarlyStopping(monitor="val_loss", mode="min", patience=30)])
+                                 EarlyStopping(monitor="validation_loss", mode="min", patience=30)])
     tuner = Tuner(trainer)
     model.hparams.lr = tuner.lr_find(model).suggestion()
     
